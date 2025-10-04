@@ -210,7 +210,7 @@ els.convertMidiBtn.addEventListener('click', async () => {
     els.saveMidiBtn.disabled = false;
     els.midiStatus.textContent = `MIDI: ${notesCount} notes • ~${Math.round(tempo)} BPM`;
   } catch (e) {
-    els.midiStatus.textContent = 'MIDI: Conversion failed';
+    els.midiStatus.textContent = `MIDI: Conversion failed — ${e?.message || 'unknown error'}`;
   }
 });
 

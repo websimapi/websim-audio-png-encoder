@@ -3,11 +3,7 @@ import * as MidiWriter from 'midi-writer-js';
 export async function convertAudioBytesToMIDI(bytes, mime = 'audio/*') {
   const blob = new Blob([bytes], { type: mime });
   const arrayBuffer = await blob.arrayBuffer();
-  const actx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100);
-  // Decode using temporary AudioContext (mobile-safe fallback)
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-  ctx.close();
+  const audioBuffer = await safeDecodeAudioBuffer(arrayBuffer);
   // Downmix to mono
   const sr = audioBuffer.sampleRate;
   const ch0 = audioBuffer.getChannelData(0);
@@ -222,4 +218,18 @@ function median(arr) {
   const a = arr.slice().sort((x,y)=>x-y);
   const m = Math.floor(a.length/2);
   return a.length ? (a.length%2 ? a[m] : (a[m-1]+a[m])/2) : 0;
+}
+
+async function safeDecodeAudioBuffer(arrayBuffer) {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new Ctx();
+  try {
+    // Safari-compatible promise wrapper
+    const buf = await new Promise((res, rej) => {
+      ctx.decodeAudioData(arrayBuffer, res, rej);
+    });
+    return buf;
+  } finally {
+    try { ctx.close(); } catch (_) {}
+  }
 }

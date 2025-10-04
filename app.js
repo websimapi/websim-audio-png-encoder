@@ -11,12 +11,16 @@ const els = {
   canvas: document.getElementById('canvas'),
   codeBlock: document.getElementById('codeBlock'),
   copyCodeBtn: document.getElementById('copyCodeBtn'),
+  convertMidiBtn: document.getElementById('convertMidiBtn'),
+  saveMidiBtn: document.getElementById('saveMidiBtn'),
+  midiStatus: document.getElementById('midiStatus'),
 };
 
 const MAGIC = new TextEncoder().encode('AUD2IMG!'); // 8 bytes
 const HEADER_BYTES = 8 /*magic*/ + 4 /*len*/;       // 12 total
 
 let fileData = null; // { name, type, bytes: Uint8Array, packed: Uint8Array, width, height }
+let midiBlob = null;
 
 function fmtBytes(n) {
   if (n == null) return '—';
@@ -48,6 +52,9 @@ els.file.addEventListener('change', async (e) => {
   els.encodeBtn.disabled = false;
   els.saveBtn.disabled = true;
   els.canvasSize.textContent = '—';
+  els.convertMidiBtn.disabled = false;
+  els.saveMidiBtn.disabled = true;
+  els.midiStatus.textContent = 'MIDI: —';
 });
 
 els.encodeBtn.addEventListener('click', () => {
@@ -83,6 +90,10 @@ els.clearBtn.addEventListener('click', () => {
   els.canvasSize.textContent = '—';
   els.encodeBtn.disabled = true;
   els.saveBtn.disabled = true;
+  els.convertMidiBtn.disabled = true;
+  els.saveMidiBtn.disabled = true;
+  midiBlob = null;
+  els.midiStatus.textContent = 'MIDI: —';
   const ctx = els.canvas.getContext('2d');
   ctx.clearRect(0,0,els.canvas.width,els.canvas.height);
   fileData = null;
@@ -188,3 +199,26 @@ function pulse(btn, text) {
 // Initialize width output
 updateWidthOut();
 
+import { convertAudioBytesToMIDI } from './audio_to_midi.js';
+
+els.convertMidiBtn.addEventListener('click', async () => {
+  if (!fileData?.bytes) return;
+  els.midiStatus.textContent = 'MIDI: Converting…';
+  try {
+    const { blob, tempo, notesCount } = await convertAudioBytesToMIDI(fileData.bytes, fileData.type);
+    midiBlob = blob;
+    els.saveMidiBtn.disabled = false;
+    els.midiStatus.textContent = `MIDI: ${notesCount} notes • ~${Math.round(tempo)} BPM`;
+  } catch (e) {
+    els.midiStatus.textContent = 'MIDI: Conversion failed';
+  }
+});
+
+els.saveMidiBtn.addEventListener('click', () => {
+  if (!midiBlob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(midiBlob);
+  a.download = (fileData?.name?.replace(/\.[^/.]+$/, '') || 'audio') + '.mid';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+});
